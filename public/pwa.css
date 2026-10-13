@@ -1,0 +1,12 @@
+.mc-pwa-install-wrap{position:fixed;right:18px;bottom:18px;z-index:2147483000;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 36px)}
+.mc-pwa-install-btn{appearance:none;border:0;border-radius:999px;padding:13px 20px;background:linear-gradient(135deg,#c9a227,#e7c85a);color:#17130a;font:800 14px/1.1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 10px 28px rgba(0,0,0,.22);cursor:pointer;white-space:nowrap;transition:transform .18s ease,box-shadow .18s ease,filter .18s ease}
+.mc-pwa-install-btn:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(0,0,0,.28);filter:brightness(1.04)}
+.mc-pwa-install-btn:focus-visible{outline:3px solid rgba(201,162,39,.45);outline-offset:3px}
+.mc-pwa-install-btn.ready{box-shadow:0 12px 34px rgba(201,162,39,.42)}
+.mc-pwa-install-note{background:rgba(20,27,39,.92);color:#fff;border-radius:999px;padding:9px 12px;font:700 12px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 8px 20px rgba(0,0,0,.18);white-space:nowrap}
+.mc-pwa-guide{position:fixed;inset:0;z-index:2147483001;display:none;place-items:center;padding:18px;background:rgba(3,12,22,.72);backdrop-filter:blur(8px)}
+.mc-pwa-guide.open{display:grid}
+.mc-pwa-guide-card{width:min(560px,100%);max-height:min(760px,calc(100vh - 36px));overflow:auto;border:1px solid #d9dee7;border-radius:22px;background:#fff;color:#172033;padding:26px;box-shadow:0 30px 90px rgba(0,0,0,.32)}
+.mc-pwa-guide-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.mc-pwa-guide h2{margin:0 0 7px;font-size:24px}.mc-pwa-guide p{color:#5d6b80;line-height:1.65}.mc-pwa-close{border:1px solid #d9dee7;background:#f5f7fa;color:#172033;border-radius:10px;width:38px;height:38px;font-size:22px;cursor:pointer}.mc-pwa-platform{margin-top:18px;border:1px solid #e2e7ee;border-radius:15px;padding:16px;background:#fafbfc}.mc-pwa-platform h3{margin:0 0 8px}.mc-pwa-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+@media(max-width:600px){.mc-pwa-install-wrap{right:12px;bottom:12px;left:12px;justify-content:center;max-width:none}.mc-pwa-install-btn{flex:1;width:auto;text-align:center}.mc-pwa-install-note{display:none}.mc-pwa-guide-card{padding:20px}.mc-pwa-guide{padding:10px}}
+@media print{.mc-pwa-install-wrap,.mc-pwa-guide{display:none!important}}

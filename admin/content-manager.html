@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="manifest" href="../manifest.json"><meta name="theme-color" content="#c9a227"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="MATHCLOUD"><link rel="stylesheet" href="../pwa.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Content Manager — MathCloud JAMB</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+<script>
+window.MathJax={tex:{inlineMath:[["\\(","\\)"],["$","$"]],displayMath:[["\\[","\\]"],["$$","$$"]],processEscapes:true},options:{skipHtmlTags:["script","noscript","style","textarea","pre","code"]}};
+</script>
+
+<style>
+/* Content Manager: readable scientific/mathematical rendering */
+:root{--content-font:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{font-family:var(--content-font)}
+.lesson-content,.rich-preview,.question-rich{font-family:var(--content-font);font-size:1rem;line-height:1.75;color:#172033}
+.lesson-content h1,.lesson-content h2,.lesson-content h3,.lesson-content h4{font-family:var(--content-font);line-height:1.35}
+.rich-preview{background:#f8fafc;border:1px solid #dbe3ef;border-radius:10px;padding:14px 16px;min-height:48px;white-space:normal;overflow:auto}
+.rich-preview .mjx-container{font-size:1.05em!important}
+.question-rich{line-height:1.55}
+.question-rich .mjx-container{font-size:1em!important}
+.editor-preview-label{display:flex;align-items:center;justify-content:space-between;margin:7px 0 6px;font-size:.82rem;font-weight:700;color:#64748b}
+.editor-preview-label span:last-child{font-weight:500}
+#lessonHtml,#qText,#qA,#qB,#qC,#qD,#qExplanation{font-family:var(--content-font);font-size:1rem;line-height:1.55}
+#lessonHtml{font-family:"Cascadia Code","Consolas",monospace;font-size:.94rem}
+.science-note{font-size:.82rem;color:#64748b;margin-top:5px}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="../assets/logo.png" alt="MathCloud Tutorial logo"><span>MathCloud JAMB · Content Manager</span></div>
+  <div class="topnav">
+    <a href="index.html">Dashboard</a>
+    <a href="content.html">Content Library</a>
+    <a href="settings.html">Settings</a>
+    <button class="btn btn-secondary" id="refresh" type="button">Refresh</button>
+    <button class="btn btn-secondary" id="logout" type="button">Sign out</button>
+  </div>
+</header>
+
+<main class="container">
+<div id="notice" class="notice" hidden></div>
+
+<section class="hero">
+  <div class="toolbar">
+    <div>
+      <p class="muted" style="margin:0">Administrator content management</p>
+      <h1 style="margin:4px 0">Questions &amp; Lessons Manager</h1>
+      <p class="muted" style="margin:0">View, search, edit, update and delete seeded JAMB lessons and questions without changing Firebase rules.</p>
+    </div>
+  </div>
+</section>
+
+<div class="grid grid-4" style="margin-top:20px">
+  <div class="card"><div class="muted">Subjects</div><div class="stat" id="totalSubjects">—</div></div>
+  <div class="card"><div class="muted">Lessons</div><div class="stat" id="totalLessons">—</div></div>
+  <div class="card"><div class="muted">Questions</div><div class="stat" id="totalQuestions">—</div></div>
+  <div class="card"><div class="muted">Topics</div><div class="stat" id="totalTopics">—</div></div>
+</div>
+
+<section class="card" style="margin-top:20px">
+  <div class="toolbar">
+    <div>
+      <h2 class="section-title">Subject overview</h2>
+      <p class="muted">Every subject shows its topic, lesson and question counts. Select a subject to manage its content.</p>
+    </div>
+    <button class="btn btn-secondary" id="recount" type="button">Recount selected subject</button>
+  </div>
+  <div class="table-wrap" style="margin-top:14px">
+    <table class="table" style="min-width:900px">
+      <thead><tr><th>Subject</th><th>Topics</th><th>Lessons</th><th>Questions</th><th>Action</th></tr></thead>
+      <tbody id="subjectBody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card" style="margin-top:20px">
+  <div class="toolbar">
+    <div>
+      <h2 class="section-title">Manage selected subject</h2>
+      <p class="muted" id="selectedSummary">Select a subject above.</p>
+    </div>
+    <div class="row">
+      <select id="subjectSelect" aria-label="Subject"></select>
+      <select id="topicSelect" aria-label="Topic"></select>
+    </div>
+  </div>
+
+  <div class="grid grid-3" style="margin-top:14px">
+    <div class="card"><div class="muted">Selected topic</div><strong id="topicName">—</strong></div>
+    <div class="card"><div class="muted">Topic questions</div><div class="stat" id="topicQuestionCount">—</div></div>
+    <div class="card"><div class="muted">Topic lesson</div><strong id="topicLessonStatus">—</strong></div>
+  </div>
+
+  <div class="toolbar" style="margin-top:18px">
+    <div><h3 style="margin:0">Lesson</h3><p class="muted" style="margin:4px 0">Edit the complete saved lesson for this topic.</p></div>
+    <div class="actions" style="margin:0"><button class="btn btn-primary" id="editLesson" type="button">Edit lesson</button><button class="btn btn-danger" id="deleteLesson" type="button">Delete lesson</button></div>
+  </div>
+  <div id="lessonBox" style="margin-top:10px"></div>
+
+  <div class="toolbar" style="margin-top:22px">
+    <div><h3 style="margin:0">Questions</h3><p class="muted" style="margin:4px 0">All questions in the selected topic are listed below. Use search to find a question, then edit or delete it.</p></div>
+    <input id="questionSearch" placeholder="Search question, ID, answer…" style="width:min(420px,80vw)" autocomplete="off">
+  </div>
+  <div id="questionBox" style="margin-top:12px"></div>
+</section>
+
+<div class="modal-backdrop" id="lessonModal" hidden>
+ <div class="modal" style="max-width:1000px">
+  <h2>Edit lesson</h2><div id="lessonNotice" class="notice" hidden></div>
+  <div class="field"><label>Lesson title</label><input id="lessonTitle"></div>
+  <div class="field"><label>Lesson content (HTML)</label><textarea id="lessonHtml" rows="18" style="width:100%"></textarea>
+    <div class="editor-preview-label"><span>Rendered preview</span><span>Mathematics, chemistry, physics and scientific symbols are rendered here.</span></div>
+    <div id="lessonEditPreview" class="rich-preview"></div>
+  </div>
+  <div class="actions"><button class="btn btn-secondary" id="lessonCancel">Cancel</button><button class="btn btn-primary" id="lessonSave">Save lesson</button></div>
+ </div>
+</div>
+
+<div class="modal-backdrop" id="questionModal" hidden>
+ <div class="modal" style="max-width:1000px">
+  <h2>Edit question</h2><div id="questionNotice" class="notice" hidden></div>
+  <div class="field"><label>Question ID</label><input id="qId" readonly></div>
+  <div class="field"><label>Question</label><textarea id="qText" rows="5" style="width:100%"></textarea><div class="editor-preview-label"><span>Rendered preview</span><span>LaTeX/Unicode scientific notation</span></div><div id="qTextPreview" class="rich-preview"></div></div>
+  <div class="grid grid-2">
+   <div class="field"><label>Option A</label><textarea id="qA" rows="3"></textarea><div id="qAPreview" class="rich-preview"></div></div>
+   <div class="field"><label>Option B</label><textarea id="qB" rows="3"></textarea><div id="qBPreview" class="rich-preview"></div></div>
+   <div class="field"><label>Option C</label><textarea id="qC" rows="3"></textarea><div id="qCPreview" class="rich-preview"></div></div>
+   <div class="field"><label>Option D</label><textarea id="qD" rows="3"></textarea><div id="qDPreview" class="rich-preview"></div></div>
+  </div>
+  <div class="grid grid-2">
+   <div class="field"><label>Correct answer</label><select id="qAnswer"><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
+   <div class="field"><label>Difficulty</label><select id="qDifficulty"><option value="easy">easy</option><option value="medium">medium</option><option value="hard">hard</option></select></div>
+  </div>
+  <div class="field"><label>Explanation</label><textarea id="qExplanation" rows="6" style="width:100%"></textarea><div class="editor-preview-label"><span>Rendered preview</span><span>Symbols and equations rendered</span></div><div id="qExplanationPreview" class="rich-preview"></div></div>
+  <div class="actions"><button class="btn btn-secondary" id="questionCancel">Cancel</button><button class="btn btn-primary" id="questionSave">Save question</button></div>
+ </div>
+</div>
+</main>
+
+<script src="../shared/app-config.js"></script>
+<script src="../shared/firebase-config.js"></script>
+<script src="../shared/app.js"></script>
+<script>
+"use strict";
+let subjects={}, contentIndex={}, lessons={}, questions=[];
+let selectedSubject="", selectedTopic="", editingQuestion=null;
+
+const esc=v=>escapeHtml(String(v??""));
+function renderRichPreview(id,value){
+  const el=document.getElementById(id); if(!el)return;
+  el.textContent=String(value??"") || "(nothing to preview)";
+  if(window.MathJax?.typesetPromise) window.MathJax.typesetPromise([el]).catch(()=>{});
+}
+function refreshLessonPreview(){renderRichPreview("lessonEditPreview",document.getElementById("lessonHtml")?.value||"");}
+function refreshQuestionPreviews(){
+  ["qText","qA","qB","qC","qD","qExplanation"].forEach(id=>renderRichPreview(id+"Preview",document.getElementById(id)?.value||""));
+}
+function typesetRenderedContent(){
+  if(!window.MathJax?.typesetPromise)return;
+  const nodes=[...document.querySelectorAll(".lesson-content,.question-rich,.rich-preview")];
+  if(nodes.length)window.MathJax.typesetPromise(nodes).catch(()=>{});
+}
+const topicName=(x,id)=>typeof x==="string"?x:String(x?.name||x?.topic||x?.title||id||"");
+const topicEntries=sid=>{
+  const raw=subjects[sid]?.topics||{};
+  return Object.entries(raw).sort((a,b)=>{
+    const ao=Number(a[1]?.order),bo=Number(b[1]?.order);
+    if(Number.isFinite(ao)&&Number.isFinite(bo)&&ao!==bo)return ao-bo;
+    return topicName(a[1],a[0]).localeCompare(topicName(b[1],b[0]));
+  });
+};
+function setTotals(){
+  const ids=Object.keys(subjects);
+  let lessonsTotal=0,questionsTotal=0,topicsTotal=0;
+  ids.forEach(sid=>{
+    const idx=contentIndex[sid]||{};
+    topicsTotal+=topicEntries(sid).length;
+    lessonsTotal+=Number(idx.lessonCount||0);
+    questionsTotal+=Number(idx.questionCount||0);
+  });
+  $("#totalSubjects").textContent=ids.length.toLocaleString();
+  $("#totalTopics").textContent=topicsTotal.toLocaleString();
+  $("#totalLessons").textContent=lessonsTotal.toLocaleString();
+  $("#totalQuestions").textContent=questionsTotal.toLocaleString();
+}
+function renderSubjects(){
+  const ids=Object.keys(subjects).sort((a,b)=>String(subjects[a]?.name||a).localeCompare(String(subjects[b]?.name||b)));
+  const opts=ids.map(id=>`<option value="${esc(id)}">${esc(subjects[id]?.name||id)}</option>`).join("");
+  $("#subjectSelect").innerHTML=opts||'<option value="">No subjects</option>';
+  if(!ids.includes(selectedSubject))selectedSubject=ids[0]||"";
+  $("#subjectSelect").value=selectedSubject;
+  $("#subjectBody").innerHTML=ids.map(sid=>{
+    const idx=contentIndex[sid]||{};
+    const topics=topicEntries(sid);
+    return `<tr>
+      <td><strong>${esc(subjects[sid]?.name||sid)}</strong><br><span class="muted">${esc(sid)}</span></td>
+      <td>${topics.length.toLocaleString()}</td>
+      <td>${Number(idx.lessonCount||0).toLocaleString()}</td>
+      <td>${Number(idx.questionCount||0).toLocaleString()}</td>
+      <td><button class="btn btn-primary" data-select-subject="${esc(sid)}">Manage</button></td>
+    </tr>`;
+  }).join("")||'<tr><td colspan="5" class="empty">No seeded subjects found.</td></tr>';
+  setTotals();
+  renderTopics();
+}
+function renderTopics(){
+  if(!selectedSubject)return;
+  const entries=topicEntries(selectedSubject);
+  const idxTopics=contentIndex[selectedSubject]?.topics||{};
+  $("#topicSelect").innerHTML=entries.map(([id,v])=>{
+    const ix=idxTopics[id]||{};
+    const count=Number(ix.questionCount??v?.questionCount??0);
+    const lesson=ix.hasLesson??v?.hasLesson;
+    return `<option value="${esc(id)}">${esc(topicName(v,id))} · ${count.toLocaleString()} Q · ${lesson?"Lesson":"No lesson"}</option>`;
+  }).join("")||'<option value="">No topics</option>';
+  if(!entries.some(x=>x[0]===selectedTopic))selectedTopic=entries[0]?.[0]||"";
+  $("#topicSelect").value=selectedTopic;
+  loadSelectedTopic();
+}
+async function loadSelectedTopic(){
+  selectedTopic=$("#topicSelect").value;
+  const sid=selectedSubject,tid=selectedTopic;
+  if(!sid||!tid){$("#selectedSummary").textContent="Select a subject and topic.";return}
+  const t=subjects[sid]?.topics?.[tid]||{};
+  const idx=contentIndex[sid]?.topics?.[tid]||{};
+  $("#topicName").textContent=topicName(t,tid);
+  $("#topicQuestionCount").textContent=Number(idx.questionCount??t.questionCount??0).toLocaleString();
+  $("#selectedSummary").textContent=`${subjects[sid]?.name||sid} · ${topicName(t,tid)}`;
+  $("#lessonBox").innerHTML='<div class="notice info">Loading lesson…</div>';
+  $("#questionBox").innerHTML='<div class="notice info">Loading questions…</div>';
+  try{
+    const [ls,qs]=await Promise.all([
+      db.ref(`lessons/${sid}/${tid}`).once("value"),
+      db.ref("questions").orderByChild("subjectTopic").equalTo(`${sid}::${tid}`).once("value")
+    ]);
+    const lesson=ls.val();
+    lessons[tid]=lesson||null;
+    const bag=qs.val()||{};
+    questions=Object.entries(bag).map(([id,q])=>({...q,id:q?.id||id}));
+    // Legacy fallback for questions without subjectTopic.
+    if(!questions.length){
+      const snap=await db.ref("questions").orderByChild("subject").equalTo(sid).once("value");
+      const all=snap.val()||{};
+      questions=Object.entries(all).map(([id,q])=>({...q,id:q?.id||id})).filter(q=>String(q.topicId||"")===tid||String(q.topic||"")===topicName(t,tid));
+    }
+    $("#topicLessonStatus").textContent=lesson?"Available":"Not saved";
+    renderLesson(lesson);
+    renderQuestions();
+  }catch(e){
+    console.error(e);
+    $("#lessonBox").innerHTML='<div class="notice error">Content could not be loaded. Check Firebase access.</div>';
+    $("#questionBox").innerHTML="";
+  }
+}
+function renderLesson(lesson){
+  if(!lesson){
+    $("#lessonBox").innerHTML='<div class="notice warning">No lesson is saved for this topic.</div>';
+    return;
+  }
+  $("#lessonBox").innerHTML=`<article class="card">
+    <div class="muted">${esc(lesson.topic||topicName(subjects[selectedSubject]?.topics?.[selectedTopic],selectedTopic))}</div>
+    <h3>${esc(lesson.title||"Lesson")}</h3>
+    <div class="lesson-content" id="lessonRendered">${lesson.html||""}</div>
+  </article>`;
+  typesetRenderedContent();
+}
+function renderQuestions(){
+  const term=$("#questionSearch").value.trim().toLowerCase();
+  const list=questions.filter(q=>`${q.id||""} ${q.question||""} ${q.correctAnswer||""} ${q.explanation||""}`.toLowerCase().includes(term));
+  $("#questionBox").innerHTML=list.length?`<div class="table-wrap"><table class="table" style="min-width:1050px">
+    <thead><tr><th>#</th><th>Question</th><th>Options</th><th>Answer</th><th>Difficulty</th><th>Actions</th></tr></thead>
+    <tbody>${list.map((q,i)=>`<tr>
+      <td>${i+1}</td>
+      <td><div class="question-rich">${esc(q.question)}</div><br><span class="muted">${esc(q.id)}</span></td>
+      <td>${["A","B","C","D"].map(k=>`<div class="question-rich"><b>${k}.</b> ${esc(q.options?.[k]||"")}</div>`).join("")}</td>
+      <td><span class="pill active">${esc(q.correctAnswer||"—")}</span></td>
+      <td>${esc(q.difficulty||"medium")}</td>
+      <td><div class="actions" style="margin:0"><button class="btn btn-secondary" data-edit-q="${esc(q.id)}">Edit</button><button class="btn btn-danger" data-delete-q="${esc(q.id)}">Delete</button></div></td>
+    </tr>`).join("")}</tbody></table></div>`:
+    '<div class="notice info">No questions match this topic/search.</div>';
+  typesetRenderedContent();
+}
+function openLessonEdit(){
+  const l=lessons[selectedTopic];
+  if(!l){showNotice("There is no saved lesson for this topic to edit.","warning");return}
+  $("#lessonTitle").value=l.title||"";
+  $("#lessonHtml").value=l.html||"";
+  $("#lessonNotice").hidden=true;
+  refreshLessonPreview();
+  $("#lessonModal").hidden=false;
+}
+async function deleteLesson(){
+  const sid=selectedSubject,tid=selectedTopic,l=lessons[tid];
+  if(!l){showNotice("There is no saved lesson for this topic.","warning");return}
+  if(!confirm(`Delete the lesson for "${topicName(subjects[sid]?.topics?.[tid],tid)}"?\n\nThe topic and its questions will remain.`))return;
+  const btn=$("#deleteLesson");btn.disabled=true;
+  try{
+    const now=Date.now();
+    await db.ref(`lessons/${sid}/${tid}`).remove();
+    await db.ref(`subjects/${sid}/topics/${tid}`).update({hasLesson:false,updatedAt:now});
+    const topic=contentIndex[sid]?.topics?.[tid]||{};
+    await db.ref(`contentIndex/${sid}/topics/${tid}`).update({hasLesson:false,updatedAt:now});
+    lessons[tid]=null;
+    if(contentIndex[sid]?.topics?.[tid])contentIndex[sid].topics[tid]={...topic,hasLesson:false};
+    $("#topicLessonStatus").textContent="Not saved";
+    renderLesson(null);
+    renderTopics();
+    showNotice("Lesson deleted successfully. The topic and questions were kept.","success");
+  }catch(e){console.error(e);showNotice("Lesson could not be deleted. Check Firebase admin write access.","error")}
+  finally{btn.disabled=false}
+}
+async function saveLesson(){
+  const sid=selectedSubject,tid=selectedTopic,l=lessons[tid];
+  if(!l)return;
+  const title=$("#lessonTitle").value.trim(),html=$("#lessonHtml").value;
+  if(!title||!html.trim()){showNotice("Lesson title and content are required.","warning","#lessonNotice");return}
+  $("#lessonSave").disabled=true;
+  try{
+    const now=Date.now();
+    await db.ref(`lessons/${sid}/${tid}`).update({title,html,updatedAt:now});
+    const current=subjects[sid]?.topics?.[tid]||{};
+    await db.ref(`subjects/${sid}/topics/${tid}`).update({hasLesson:true,name:current.name||topicName(current,tid),topicId:tid});
+    lessons[tid]={...l,title,html,updatedAt:now};
+    contentIndex[sid]=contentIndex[sid]||{topics:{}};
+    contentIndex[sid].topics=contentIndex[sid].topics||{};
+    contentIndex[sid].topics[tid]={...(contentIndex[sid].topics[tid]||{}),hasLesson:true};
+    $("#lessonModal").hidden=true;renderLesson(lessons[tid]);$("#topicLessonStatus").textContent="Available";
+    showNotice("Lesson updated successfully.","success");
+  }catch(e){console.error(e);showNotice("Lesson could not be updated. Check Firebase admin write access.","error","#lessonNotice")}
+  finally{$("#lessonSave").disabled=false}
+}
+function openQuestionEdit(id){
+  const q=questions.find(x=>String(x.id)===String(id));if(!q)return;
+  editingQuestion=q;
+  $("#qId").value=q.id;$("#qText").value=q.question||"";
+  $("#qA").value=q.options?.A||"";$("#qB").value=q.options?.B||"";$("#qC").value=q.options?.C||"";$("#qD").value=q.options?.D||"";
+  $("#qAnswer").value=q.correctAnswer||"A";$("#qDifficulty").value=q.difficulty||"medium";$("#qExplanation").value=q.explanation||"";
+  $("#questionNotice").hidden=true;$("#questionModal").hidden=false;
+  refreshQuestionPreviews();
+}
+async function saveQuestion(){
+  if(!editingQuestion)return;
+  const opts={A:$("#qA").value.trim(),B:$("#qB").value.trim(),C:$("#qC").value.trim(),D:$("#qD").value.trim()};
+  const vals=Object.values(opts).map(x=>x.replace(/\s+/g," ").toLowerCase());
+  if(!$("#qText").value.trim()||Object.values(opts).some(x=>!x)){showNotice("Question and all four options are required.","warning","#questionNotice");return}
+  if(new Set(vals).size!==4){showNotice("Options A–D must be different.","warning","#questionNotice");return}
+  const answer=$("#qAnswer").value;
+  $("#questionSave").disabled=true;
+  try{
+    const sid=selectedSubject,tid=selectedTopic,id=editingQuestion.id;
+    const updated={...editingQuestion,question:$("#qText").value.trim(),options:opts,correctAnswer:answer,difficulty:$("#qDifficulty").value||"medium",explanation:$("#qExplanation").value,subject:sid,subjectName:subjects[sid]?.name||editingQuestion.subjectName,topicId:tid,topic:editingQuestion.topic||topicName(subjects[sid]?.topics?.[tid],tid),subjectTopic:`${sid}::${tid}`,updatedAt:Date.now(),active:editingQuestion.active!==false};
+    const updates={};
+    updates[`questions/${id}`]=updated;
+    updates[`publicQuestions/${id}`]=updated;
+    updates[`publicQuestionIndex/${sid}/${id}`]={topicId:tid,topic:updated.topic,active:updated.active!==false};
+    await db.ref().update(updates);
+    const ix=contentIndex[sid]||{};
+    ix.topics=ix.topics||{};
+    ix.topics[tid]={...(ix.topics[tid]||{}),questionCount:questions.length};
+    contentIndex[sid]=ix;
+    questions=questions.map(q=>String(q.id)===String(id)?updated:q);
+    $("#questionModal").hidden=true;renderQuestions();showNotice("Question updated successfully.","success");
+  }catch(e){console.error(e);showNotice("Question could not be updated. Check Firebase admin write access.","error","#questionNotice")}
+  finally{$("#questionSave").disabled=false}
+}
+async function deleteQuestion(id){
+  const q=questions.find(x=>String(x.id)===String(id));if(!q)return;
+  if(!confirm(`Delete this question permanently?\\n\\n${q.question||id}`))return;
+  try{
+    const sid=selectedSubject;
+    const updates={};
+    updates[`questions/${id}`]=null;
+    updates[`publicQuestions/${id}`]=null;
+    updates[`publicQuestionIndex/${sid}/${id}`]=null;
+    await db.ref().update(updates);
+    questions=questions.filter(x=>String(x.id)!==String(id));
+    await syncCounts(sid);
+    renderQuestions();
+    showNotice("Question deleted from the question bank and student-readable copy.","success");
+  }catch(e){console.error(e);showNotice("Question could not be deleted. Check Firebase admin write access.","error")}
+}
+async function syncCounts(sid){
+  const lessonSnap=await db.ref(`lessons/${sid}`).once("value");
+  const lessonBag=lessonSnap.val()||{};
+  const qsnap=await db.ref("questions").orderByChild("subject").equalTo(sid).once("value");
+  const all=qsnap.val()||{};
+  const rows=Object.values(all);
+  const counts={};
+  rows.forEach(q=>{const tid=String(q?.topicId||"general");counts[tid]=(counts[tid]||0)+1});
+  const topicUpdates={},indexTopics={};
+  topicEntries(sid).forEach(([tid,t],i)=>{
+    const rec={topicId:tid,name:topicName(t,tid),order:Number.isFinite(Number(t?.order))?Number(t.order):i+1,questionCount:Number(counts[tid]||0),hasLesson:Object.prototype.hasOwnProperty.call(lessonBag,tid)};
+    topicUpdates[`subjects/${sid}/topics/${tid}`]=rec;
+    indexTopics[tid]={name:rec.name,order:rec.order,questionCount:rec.questionCount,hasLesson:rec.hasLesson};
+  });
+  await db.ref().update(topicUpdates);
+  await db.ref(`contentIndex/${sid}`).set({subject:sid,name:subjects[sid]?.name||sid,lessonCount:Object.keys(lessonBag).length,questionCount:rows.length,topics:indexTopics,updatedAt:Date.now()});
+  contentIndex[sid]={subject:sid,name:subjects[sid]?.name||sid,lessonCount:Object.keys(lessonBag).length,questionCount:rows.length,topics:indexTopics,updatedAt:Date.now()};
+  subjects[sid].topics=subjects[sid].topics||{};
+  Object.entries(indexTopics).forEach(([tid,v])=>subjects[sid].topics[tid]={...(subjects[sid].topics[tid]||{}),...v});
+  setTotals();renderSubjects();
+}
+async function recountSelected(){
+  if(!selectedSubject){showNotice("Select a subject first.","warning");return}
+  try{await syncCounts(selectedSubject);showNotice("Counts rebuilt from Firebase for the selected subject.","success")}catch(e){console.error(e);showNotice("Recount failed. Check Firebase admin write access.","error")}
+}
+async function load(){
+  $("#subjectBody").innerHTML='<tr><td colspan="5" class="empty">Loading subjects and counts…</td></tr>';
+  try{
+    const [ss,is]=await Promise.all([db.ref("subjects").once("value"),db.ref("contentIndex").once("value").catch(()=>null)]);
+    subjects=ss.val()||{};contentIndex=is?.val()||{};
+    renderSubjects();
+  }catch(e){console.error(e);showNotice("Content manager could not load Firebase content. Check admin access.","error")}
+}
+$("#subjectBody").addEventListener("click",e=>{const b=e.target.closest("[data-select-subject]");if(!b)return;selectedSubject=b.dataset.selectSubject;selectedTopic="";$("#subjectSelect").value=selectedSubject;renderTopics();window.scrollTo({top:document.querySelector("#selectedSummary").getBoundingClientRect().top+window.scrollY-90,behavior:"smooth"})});
+$("#subjectSelect").onchange=()=>{selectedSubject=$("#subjectSelect").value;selectedTopic="";renderTopics()};
+$("#topicSelect").onchange=loadSelectedTopic;
+$("#questionSearch").oninput=renderQuestions;
+["qText","qA","qB","qC","qD","qExplanation"].forEach(id=>$("#"+id).addEventListener("input",refreshQuestionPreviews));
+$("#lessonHtml").addEventListener("input",refreshLessonPreview);
+$("#editLesson").onclick=openLessonEdit;
+$("#deleteLesson").onclick=deleteLesson;
+$("#lessonCancel").onclick=()=>$("#lessonModal").hidden=true;
+$("#lessonSave").onclick=saveLesson;
+$("#questionCancel").onclick=()=>$("#questionModal").hidden=true;
+$("#questionSave").onclick=saveQuestion;
+$("#questionBox").addEventListener("click",e=>{
+ const ed=e.target.closest("[data-edit-q]");if(ed){openQuestionEdit(ed.dataset.editQ);return}
+ const del=e.target.closest("[data-delete-q]");if(del)deleteQuestion(del.dataset.deleteQ);
+});
+$("#recount").onclick=recountSelected;
+$("#refresh").onclick=load;
+$("#logout").onclick=async()=>{await auth.signOut();location.replace("../student/index.html")};
+requireAdminAuth(async()=>{await load()});
+</script>
+<script src="../pwa.js"></script></body>
+</html>
